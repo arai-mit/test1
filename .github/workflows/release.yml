@@ -76,15 +76,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') {
-            throw "Releaseタグは v1.0.0 の形式で指定してください: $env:RELEASE_TAG"
+          $releaseTag = $env:RELEASE_TAG.Trim()
+          if ($releaseTag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Releaseタグは v1.0.0 の形式で指定してください: $releaseTag"
           }
 
-          gh release view $env:RELEASE_TAG 2>$null
+          gh release view $releaseTag 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --target $env:GITHUB_SHA --title $env:RELEASE_TAG --generate-notes
+            gh release create $releaseTag --target $env:GITHUB_SHA --title $releaseTag --generate-notes
             if ($LASTEXITCODE -ne 0) { throw "GitHub Releaseの作成に失敗しました" }
           }
 
-          gh release upload $env:RELEASE_TAG $env:ZIP_NAME --clobber
+          gh release upload $releaseTag $env:ZIP_NAME --clobber
           if ($LASTEXITCODE -ne 0) { throw "Release Assetのアップロードに失敗しました" }
