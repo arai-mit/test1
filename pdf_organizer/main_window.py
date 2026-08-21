@@ -17,6 +17,8 @@ from .widgets import FileDropList, page_pixmap
 
 
 class MainWindow(QMainWindow):
+    THUMBNAIL_WIDTHS = (90, 130, 180)
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("経理実務向け PDF整理ツール")
@@ -47,6 +49,7 @@ class MainWindow(QMainWindow):
         lv.addWidget(self.file_list); splitter.addWidget(left)
         center = QWidget(); cv = QVBoxLayout(center); cv.addWidget(QLabel("ページ（Ctrl/Shiftで複数選択、ドラッグで並び替え）"))
         self.pages = FileDropList(); self.pages.setViewMode(QListView.ViewMode.IconMode); self.pages.setResizeMode(QListView.ResizeMode.Adjust)
+        self.pages.setIconSize(self._default_thumbnail_icon_size())
         self.pages.setSelectionMode(QAbstractItemView.ExtendedSelection); self.pages.setWrapping(True)
         self.pages.orderChanged.connect(self.sync_page_order); cv.addWidget(self.pages); splitter.addWidget(center)
         right = QWidget(); rv = QVBoxLayout(right); rv.addWidget(QLabel("選択PDF／ページの操作"))
@@ -91,14 +94,30 @@ class MainWindow(QMainWindow):
 
     def refresh_pages(self) -> None:
         self.pages.clear()
+        self.pages.setIconSize(self._default_thumbnail_icon_size())
         if not (0 <= self.current_index < len(self.documents)): return
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
+            thumbnails = []
             for n, page in enumerate(self.documents[self.current_index].pages, 1):
-                item = QListWidgetItem(page_pixmap(page, self.thumb_width), f"{n}ページ")
-                item.setData(Qt.UserRole, id(page)); item.setSizeHint(QSize(self.thumb_width + 24, self.thumb_width + 75)); self.pages.addItem(item)
+                thumbnails.append((n, page, page_pixmap(page, self.thumb_width)))
+
+            if thumbnails:
+                self.pages.setIconSize(QSize(
+                    max(pixmap.width() for _, _, pixmap in thumbnails),
+                    max(pixmap.height() for _, _, pixmap in thumbnails),
+                ))
+            for n, page, pixmap in thumbnails:
+                item = QListWidgetItem(pixmap, f"{n}ページ")
+                item.setData(Qt.UserRole, id(page))
+                item.setSizeHint(QSize(pixmap.width() + 24, pixmap.height() + 40))
+                self.pages.addItem(item)
         except Exception as exc: self.error(f"サムネイルを表示できません。\n{exc}")
         finally: QApplication.restoreOverrideCursor()
+
+    def _default_thumbnail_icon_size(self) -> QSize:
+        """Return a portrait-A4-sized icon area until page dimensions are known."""
+        return QSize(self.thumb_width, round(self.thumb_width * 2**0.5))
 
     def snapshot(self) -> None: self.history.push(self.documents)
     def current(self) -> WorkingPdf | None: return self.documents[self.current_index] if 0 <= self.current_index < len(self.documents) else None
@@ -167,7 +186,7 @@ class MainWindow(QMainWindow):
         doc.pages = [by_id[self.pages.item(i).data(Qt.UserRole)] for i in range(self.pages.count())]; self.refresh_pages()
 
     def change_thumbnail_size(self, index: int) -> None:
-        self.thumb_width = [90, 130, 180][index]; self.refresh_pages()
+        self.thumb_width = self.THUMBNAIL_WIDTHS[index]; self.refresh_pages()
 
     def undo(self) -> None:
         state = self.history.undo()
