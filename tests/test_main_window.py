@@ -66,6 +66,45 @@ def test_unique_save_folder_uses_numbered_suffix(tmp_path: Path) -> None:
     assert result == tmp_path / "PDF整理結果_20260821_1721_3"
 
 
+def test_save_all_formats_only_timestamp_with_strftime(
+    application: QApplication, monkeypatch, tmp_path: Path
+) -> None:
+    formats = []
+    prompted_names = []
+
+    class FakeDateTime:
+        @classmethod
+        def now(cls):
+            return cls()
+
+        def strftime(self, value: str) -> str:
+            formats.append(value)
+            return "20260821_1721"
+
+    window = MainWindow()
+    window.documents = [WorkingPdf(name="sample.pdf", pages=[], source_dir=tmp_path)]
+    monkeypatch.setattr("pdf_organizer.main_window.datetime", FakeDateTime)
+    monkeypatch.setattr(
+        "pdf_organizer.main_window.QFileDialog.getExistingDirectory",
+        lambda *args: str(tmp_path),
+    )
+
+    def cancel_folder_name(*args, **kwargs):
+        prompted_names.append(kwargs["text"])
+        return "", False
+
+    monkeypatch.setattr(
+        "pdf_organizer.main_window.QInputDialog.getText", cancel_folder_name
+    )
+    try:
+        window.save_all()
+
+        assert formats == ["%Y%m%d_%H%M"]
+        assert prompted_names == ["PDF整理結果_20260821_1721"]
+    finally:
+        window.close()
+
+
 def test_save_all_creates_named_folder_and_saves_every_pdf(
     application: QApplication, monkeypatch, tmp_path: Path
 ) -> None:
