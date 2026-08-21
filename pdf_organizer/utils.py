@@ -24,6 +24,16 @@ def validate_pdf_name(name: str) -> str:
     return name
 
 
+def validate_folder_name(name: str) -> str:
+    """Return a Windows-compatible folder name, or raise a Japanese error."""
+    name = name.strip()
+    if not name or INVALID_WINDOWS_CHARS.search(name) or any(ord(char) < 32 for char in name):
+        raise InvalidFileName('フォルダ名にWindowsで使用できない文字（\\ / : * ? " < > |）が含まれています。')
+    if name.endswith((" ", ".")) or name.split(".", 1)[0].upper() in RESERVED_WINDOWS_NAMES:
+        raise InvalidFileName("Windowsで使用できないフォルダ名です。")
+    return name
+
+
 def parse_page_ranges(text: str, page_count: int) -> list[list[int]]:
     """1始まりの `1-3, 4-7` または改行区切りを0始まりへ変換する。"""
     chunks = [x.strip() for x in re.split(r"[,\n]+", text) if x.strip()]
