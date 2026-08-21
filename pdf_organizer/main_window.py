@@ -208,7 +208,8 @@ class MainWindow(QMainWindow):
         if not self.documents: return self.error("保存するPDFがありません。")
         parent = QFileDialog.getExistingDirectory(self, "保存先を選択", str(self.documents[0].source_dir))
         if not parent: return
-        default_name = datetime.now().strftime("PDF整理結果_%Y%m%d_%H%M")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        default_name = f"PDF整理結果_{timestamp}"
         name, ok = QInputDialog.getText(
             self, "保存フォルダ名", "新しく作成するフォルダ名:", text=default_name
         )
