@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QFileDialog,
-    QFormLayout, QHBoxLayout, QInputDialog, QLabel, QListWidgetItem, QMainWindow,
+    QFormLayout, QHBoxLayout, QInputDialog, QLabel, QListView, QListWidgetItem, QMainWindow,
     QMessageBox, QPushButton, QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
 from .errors import PdfOrganizerError
@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         self.file_list.orderChanged.connect(self.sync_document_order); self.file_list.currentRowChanged.connect(self.select_document)
         lv.addWidget(self.file_list); splitter.addWidget(left)
         center = QWidget(); cv = QVBoxLayout(center); cv.addWidget(QLabel("ページ（Ctrl/Shiftで複数選択、ドラッグで並び替え）"))
-        self.pages = FileDropList(); self.pages.setViewMode(self.pages.IconMode); self.pages.setResizeMode(self.pages.Adjust)
+        self.pages = FileDropList(); self.pages.setViewMode(QListView.ViewMode.IconMode); self.pages.setResizeMode(QListView.ResizeMode.Adjust)
         self.pages.setSelectionMode(QAbstractItemView.ExtendedSelection); self.pages.setWrapping(True)
         self.pages.orderChanged.connect(self.sync_page_order); cv.addWidget(self.pages); splitter.addWidget(center)
         right = QWidget(); rv = QVBoxLayout(right); rv.addWidget(QLabel("選択PDF／ページの操作"))
