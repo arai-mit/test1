@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QFileDialog,
     QFormLayout, QHBoxLayout, QInputDialog, QLabel, QListView, QListWidgetItem, QMainWindow,
     QMessageBox, QPushButton, QSpinBox, QSplitter, QVBoxLayout, QWidget)
@@ -12,7 +13,7 @@ from .errors import PdfOrganizerError
 from .history import History
 from .models import WorkingPdf
 from .pdf_service import load_pdf, merge, save_pdf, split_at, split_every, split_ranges
-from .utils import validate_pdf_name
+from .utils import validate_folder_name, validate_pdf_name
 from .widgets import FileDropList, page_pixmap
 
 
@@ -205,12 +206,43 @@ class MainWindow(QMainWindow):
 
     def save_all(self) -> None:
         if not self.documents: return self.error("保存するPDFがありません。")
-        folder = QFileDialog.getExistingDirectory(self, "保存先フォルダ", str(self.documents[0].source_dir))
-        if not folder: return
+        parent = QFileDialog.getExistingDirectory(self, "保存先を選択", str(self.documents[0].source_dir))
+        if not parent: return
+        default_name = datetime.now().strftime("PDF整理結果_%Y%m%d_%H%M")
+        name, ok = QInputDialog.getText(
+            self, "保存フォルダ名", "新しく作成するフォルダ名:", text=default_name
+        )
+        if not ok: return
+        try:
+            name = validate_folder_name(name)
+            folder = self._unique_folder(Path(parent), name)
+            folder.mkdir()
+        except (PdfOrganizerError, OSError) as exc:
+            message = str(exc) if isinstance(exc, PdfOrganizerError) else f"保存先フォルダを作成できません。\n{exc}"
+            return self.error(message)
         saved = 0
         for doc in self.documents:
-            if self._save_one(doc, Path(folder) / doc.name): saved += 1
-        self.statusBar().showMessage(f"{saved}件のPDFを保存しました。", 5000)
+            if self._save_one(doc, folder / doc.name): saved += 1
+        self._show_save_complete(saved, folder)
+
+    @staticmethod
+    def _unique_folder(parent: Path, name: str) -> Path:
+        folder = parent / name
+        suffix = 2
+        while folder.exists():
+            folder = parent / f"{name}_{suffix}"
+            suffix += 1
+        return folder
+
+    def _show_save_complete(self, saved: int, folder: Path) -> None:
+        message = f"{saved}件のPDFを保存しました。\n保存先：{folder}"
+        self.statusBar().showMessage(message.replace("\n", " "), 10000)
+        box = QMessageBox(QMessageBox.Information, "保存完了", message, parent=self)
+        open_button = box.addButton("保存先フォルダを開く", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Close)
+        box.exec()
+        if box.clickedButton() == open_button:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def _save_one(self, doc: WorkingPdf, path: Path) -> bool:
         if path.exists():
