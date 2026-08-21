@@ -1,0 +1,90 @@
+name: Windows完成版をリリース
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "作成するReleaseのタグ（例: v1.0.0）"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: テスト・Windowsビルド・Release作成
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+      EXE_NAME: 経理PDF整理ツール.exe
+      DISTRIBUTION_NAME: 経理PDF整理ツール_Windows
+      ZIP_NAME: 経理PDF整理ツール_Windows.zip
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonをセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 開発・ビルド依存関係をインストール
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: テストを実行
+        shell: pwsh
+        run: python -m pytest
+
+      - name: PyInstallerでWindows版exeを作成
+        shell: pwsh
+        run: python -m PyInstaller --noconfirm --clean pdf-organizer.spec
+
+      - name: exeの生成を確認
+        shell: pwsh
+        run: |
+          $exePath = Join-Path "dist" $env:EXE_NAME
+          if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
+            throw "PyInstallerの出力が見つかりません: $exePath"
+          }
+          if ((Get-Item -LiteralPath $exePath).Length -eq 0) {
+            throw "生成されたexeが空です: $exePath"
+          }
+
+      - name: 配布用フォルダーを作成
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path $env:DISTRIBUTION_NAME -Force | Out-Null
+          Copy-Item -LiteralPath (Join-Path "dist" $env:EXE_NAME) -Destination $env:DISTRIBUTION_NAME
+
+      - name: 完成版ZIPを作成
+        shell: pwsh
+        run: |
+          Compress-Archive -LiteralPath $env:DISTRIBUTION_NAME -DestinationPath $env:ZIP_NAME -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $env:ZIP_NAME -PathType Leaf)) {
+            throw "配布用ZIPの作成に失敗しました: $env:ZIP_NAME"
+          }
+
+      - name: GitHub Releaseを作成しZIPを添付
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Releaseタグは v1.0.0 の形式で指定してください: $env:RELEASE_TAG"
+          }
+
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --target $env:GITHUB_SHA --title $env:RELEASE_TAG --generate-notes
+            if ($LASTEXITCODE -ne 0) { throw "GitHub Releaseの作成に失敗しました" }
+          }
+
+          gh release upload $env:RELEASE_TAG $env:ZIP_NAME --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Release Assetのアップロードに失敗しました" }
