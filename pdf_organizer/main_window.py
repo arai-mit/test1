@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         self.documents: list[WorkingPdf] = []
         self.current_index = -1
         self.history = History()
-        self.thumb_width = 130
+        self.thumb_width = 520
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         center = QWidget(); cv = QVBoxLayout(center); cv.addWidget(QLabel("ページ（Ctrl/Shiftで複数選択、ドラッグで並び替え）"))
         self.pages = FileDropList(); self.pages.setViewMode(QListView.ViewMode.IconMode); self.pages.setResizeMode(QListView.ResizeMode.Adjust)
         self.pages.setSelectionMode(QAbstractItemView.ExtendedSelection); self.pages.setWrapping(True)
+        self.pages.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded); self.pages.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.pages.orderChanged.connect(self.sync_page_order); cv.addWidget(self.pages); splitter.addWidget(center)
         right = QWidget(); rv = QVBoxLayout(right); rv.addWidget(QLabel("選択PDF／ページの操作"))
         for text, slot in (("名前変更", self.rename), ("左へ90度回転", lambda: self.rotate(-90)),
@@ -96,7 +97,7 @@ class MainWindow(QMainWindow):
         try:
             for n, page in enumerate(self.documents[self.current_index].pages, 1):
                 item = QListWidgetItem(page_pixmap(page, self.thumb_width), f"{n}ページ")
-                item.setData(Qt.UserRole, id(page)); item.setSizeHint(QSize(self.thumb_width + 24, self.thumb_width + 75)); self.pages.addItem(item)
+                item.setData(Qt.UserRole, id(page)); item.setSizeHint(QSize(self.thumb_width + 96, self.thumb_width + 300)); self.pages.addItem(item)
         except Exception as exc: self.error(f"サムネイルを表示できません。\n{exc}")
         finally: QApplication.restoreOverrideCursor()
 
@@ -167,7 +168,7 @@ class MainWindow(QMainWindow):
         doc.pages = [by_id[self.pages.item(i).data(Qt.UserRole)] for i in range(self.pages.count())]; self.refresh_pages()
 
     def change_thumbnail_size(self, index: int) -> None:
-        self.thumb_width = [90, 130, 180][index]; self.refresh_pages()
+        self.thumb_width = [360, 520, 720][index]; self.refresh_pages()
 
     def undo(self) -> None:
         state = self.history.undo()
